@@ -1,0 +1,18 @@
+<resources>
+    <string name="app_name">ImageTranslation</string>
+    <string name="image_translation">Image Translation</string>
+    <string name="go">go</string>
+    <!--<string name="enter_url">Enter URL</string>-->
+    <string name="enter_url">Enter URL</string>
+    <string name="naver">Naver</string>
+    <string name="google">Google</string>
+    <string name="ytube">Ytube</string>
+    <string name="daum">Daum</string>
+    <string name="hongik">Hongik</string>
+    <string name="plus">+</string>
+    <string name="Back">(</string>
+    <string name="Home">Home</string>
+    <string name="Refresh">F5</string>
+    <string name="Forward">)</string>
+    <string name="SCap">SCap</string>
+</resources>
