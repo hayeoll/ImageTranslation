@@ -7,5 +7,13 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFF</color>
-    <color name="navy_it">#191970</color>
+    <color name="light_yellow">#FFF8ED8B</color>
+    <color name="powder_blue">#B0E0E6</color>
+    <color name="white_it">#F5F5F5</color>
+    <color name="navy_it">#364F6B</color>
+    <color name="teal_it">#3FC1C9</color>
+    <color name="pink_it">#FC5185</color>
+    <color name="darkgray">#A9A9A9</color>
+    <color name="dimgray">#696969</color>
+    <color name="gainsboro">#DCDCDC</color>
 </resources>

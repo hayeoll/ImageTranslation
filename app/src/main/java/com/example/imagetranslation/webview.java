@@ -36,8 +36,7 @@ import java.util.Date;
 public class webview extends AppCompatActivity implements OnEditorActionListener {
     private InputMethodManager imm;
     private WebView webview;
-    private long backBtnTime
-            = 0;
+    private long backBtnTime = 0;
     public Button menuSC, menuBack, menuForward, menuRefresh, buttonGo;
     private EditText et_url;
 
