@@ -9,7 +9,6 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.util.Base64;
-import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
@@ -18,10 +17,7 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.widget.Button;
-import android.widget.EditText;
-import android.widget.Toast;
-import android.widget.TextView;
+import android.widget.*;
 import android.widget.TextView.OnEditorActionListener;
 
 import androidx.annotation.Nullable;
@@ -31,10 +27,15 @@ import androidx.appcompat.app.AppCompatActivity;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+
 public class webview extends AppCompatActivity implements OnEditorActionListener {
     private InputMethodManager imm;
     private WebView webview;
-    private long backBtnTime = 0;
+    private long backBtnTime
+            = 0;
     public Button menuSC, menuBack, menuForward, menuRefresh, buttonGo;
     private EditText et_url;
 
@@ -116,8 +117,40 @@ public class webview extends AppCompatActivity implements OnEditorActionListener
 
         // Model Button
         menuSC.setOnClickListener(new View.OnClickListener() {
-            @Override
+                        @Override
             public void onClick(View v) {
+
+                webview.getDrawingCache(true);
+                String CAPTURE_PATH = "/CAPTURE_TEST";
+
+                webview.buildDrawingCache();
+                Bitmap captureView = webview.getDrawingCache();
+                FileOutputStream fos = null;
+
+                String strFolderPath = "/data/data/com.example.imagetranslation" + CAPTURE_PATH;
+                File folder = new File(strFolderPath);
+                if(!folder.exists()){
+                    folder.mkdirs();
+                }
+
+                String strFilePath = strFolderPath + "/" + System.currentTimeMillis() +".png";
+                File fileCacheItem = new File(strFilePath);
+
+                try {
+                    fos = new FileOutputStream(fileCacheItem);
+                    captureView.compress(Bitmap.CompressFormat.PNG, 100, fos);
+                    fos.flush();
+                    fos.close();
+                } catch (FileNotFoundException e){
+                    e.printStackTrace();
+                } catch (Throwable e) {
+                    e.printStackTrace();
+                }
+
+                webview.getDrawingCache(false);
+
+
+
 /*
                 Log.d("SC","SC Start");
 
