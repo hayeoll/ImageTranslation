@@ -147,6 +147,7 @@ public class webview extends AppCompatActivity implements OnEditorActionListener
                     e.printStackTrace();
                 }
 
+                captureView = null;
                 webview.getDrawingCache(false);
 
 
