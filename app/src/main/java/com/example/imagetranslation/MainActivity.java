@@ -1,30 +1,23 @@
 package com.example.imagetranslation;
 
-import android.content.Context;
-import android.graphics.Bitmap;
-import android.provider.MediaStore;
-import android.util.Base64;
-import android.view.KeyEvent;
-import android.view.inputmethod.EditorInfo;
-import android.view.inputmethod.InputMethodManager;
-import android.widget.TextView;
-import android.widget.Toast;
-import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.content.DialogInterface;
 import android.os.Bundle;
 import android.content.Intent;
 import android.net.Uri;
 import android.view.View;
+import android.view.ViewGroup;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.EditText;
-
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
+import android.widget.AdapterView;
+import android.widget.BaseAdapter;
+import android.widget.TextView;
 
 public class MainActivity extends AppCompatActivity {
     private Button buttonN;
@@ -33,6 +26,8 @@ public class MainActivity extends AppCompatActivity {
     private Button buttonD;
     private Button buttonH;
     private Button buttonGo;
+    private Button buttonP;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -90,6 +85,20 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        //setting
+        buttonP = findViewById(R.id.buttonP);
+        buttonP.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                switch (v.getId()) {
+                    case R.id.buttonP:
+                        Intent intent = new Intent(MainActivity.this, setting.class);
+                        startActivityForResult(intent, 1);
+
+                        break;
+                }
+            }
+        });
+
         // URL 입력받아 이동
         buttonGo = findViewById(R.id.buttonGO);
         buttonGo.setOnClickListener(new View.OnClickListener() {
@@ -105,9 +114,4 @@ public class MainActivity extends AppCompatActivity {
             }
         });
     }
-
-
-
-
-
 }

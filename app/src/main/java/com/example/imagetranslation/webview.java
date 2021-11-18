@@ -9,7 +9,6 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.util.Base64;
-import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
@@ -18,10 +17,7 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.widget.Button;
-import android.widget.EditText;
-import android.widget.Toast;
-import android.widget.TextView;
+import android.widget.*;
 import android.widget.TextView.OnEditorActionListener;
 
 import androidx.annotation.Nullable;
@@ -30,6 +26,12 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 public class webview extends AppCompatActivity implements OnEditorActionListener {
     private InputMethodManager imm;
@@ -118,6 +120,47 @@ public class webview extends AppCompatActivity implements OnEditorActionListener
         menuSC.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+
+                //drawing cache 허용.
+                //cache에 실제로 cache저장
+                //cache에 저장된 bitmap을 가져온다.
+                webview.getDrawingCache(true);
+                webview.buildDrawingCache();
+                Bitmap captureView = webview.getDrawingCache();
+                FileOutputStream fos = null;
+
+                //dir이름과 path지정. dir가 없을 경우 dir 생성
+                String CAPTURE_PATH = "/CAPTURE_TEST";
+                String strFolderPath = "/data/data/com.example.imagetranslation" + CAPTURE_PATH;
+                File folder = new File(strFolderPath);
+                if(!folder.exists()){
+                    folder.mkdirs();
+                }
+
+                //생성될 img이름 지정
+                SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMddHHmmss");
+                Date currentTime = new Date();
+                String dateString = formatter.format(currentTime);
+
+                String strFilePath = strFolderPath + "/" + dateString +".png";
+                File fileCacheItem = new File(strFilePath);
+
+                try {
+                    fos = new FileOutputStream(fileCacheItem);
+                    captureView.compress(Bitmap.CompressFormat.PNG, 100, fos);
+                    fos.flush();
+                    fos.close();
+                } catch (FileNotFoundException e){
+                    e.printStackTrace();
+                } catch (Throwable e) {
+                    e.printStackTrace();
+                }
+                Toast.makeText(getApplicationContext(), dateString + ".png 저장", Toast.LENGTH_LONG).show();
+                webview.getDrawingCache(false);
+                webview.destroyDrawingCache();
+
+
+
 /*
                 Log.d("SC","SC Start");
 
