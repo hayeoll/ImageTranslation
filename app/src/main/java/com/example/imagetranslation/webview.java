@@ -1,5 +1,6 @@
 package com.example.imagetranslation;
 
+import android.annotation.SuppressLint;
 import android.content.ContentUris;
 import android.content.Context;
 import android.content.Intent;
@@ -7,8 +8,12 @@ import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.provider.MediaStore;
+import android.speech.tts.TextToSpeech;
 import android.util.Base64;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
@@ -19,6 +24,8 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.*;
 import android.widget.TextView.OnEditorActionListener;
+
+
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
@@ -32,6 +39,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Locale;
 
 public class webview extends AppCompatActivity implements OnEditorActionListener {
     private InputMethodManager imm;
@@ -40,9 +48,10 @@ public class webview extends AppCompatActivity implements OnEditorActionListener
     public Button menuSC, menuBack, menuForward, menuRefresh, buttonGo;
     private EditText et_url;
 
+    private TextToSpeech tts;
     private Bitmap bitmap;
     private String encodedImg;
-    private String imgPath;
+
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -92,6 +101,18 @@ public class webview extends AppCompatActivity implements OnEditorActionListener
 
         webview.loadUrl(get_url);
 
+        //TTS 객체 초기화
+        tts = new TextToSpeech(getApplicationContext(), new TextToSpeech.OnInitListener() {
+            @Override
+            public void onInit(int state) {
+                if (state == TextToSpeech.SUCCESS) {
+                    tts.setLanguage(Locale.KOREAN);
+                } else {
+                    Log.e("TTS", "TTS 객체 초기화 오류");
+                }
+            }
+        });
+
         menuBack.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -124,9 +145,48 @@ public class webview extends AppCompatActivity implements OnEditorActionListener
                 //drawing cache 허용.
                 //cache에 실제로 cache저장
                 //cache에 저장된 bitmap을 가져온다.
+
                 webview.getDrawingCache(true);
                 webview.buildDrawingCache();
-                Bitmap captureView = webview.getDrawingCache();
+                try {
+                    getIMG();
+                    Log.i("OCR", "encodedImg: "+encodedImg);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    Log.e("OCR", "getIMG 실패 !!!!!");
+                }
+                new Thread(() -> {
+                    Log.d("OCR", "쓰레드 시작");
+                    Log.d("OCR", "OCR encodedImg : "+encodedImg);
+
+
+                    // OCR
+                    if(encodedImg !=null)
+                    {
+                        Vision vi = new Vision();
+                        Log.d("OCR", "OCR 실행");
+                        String ocrText = vi.OCR(encodedImg);
+                        Log.i("OCR", ocrText);
+
+                    } else{
+                        Log.e("OCR", "OCR encodedImg 전송 실패");
+                    }
+
+                    String text = "한국말도 할 수 있어요. Hello, I'm sleepy";
+                    Papago papago = new Papago();
+                    String resultWord = papago.getTranslation(text, "en");
+                    Log.d("papago", "resultWord: "+resultWord);
+
+                    Bundle papagoBundle = new Bundle();
+                    papagoBundle.putString("resultWord", resultWord);
+
+                    Message msg = papago_handler.obtainMessage();
+                    msg.setData(papagoBundle);
+                    papago_handler.sendMessage(msg);
+
+                }).start();
+                // Bitmap captureView = webview.getDrawingCache();
+/*
                 FileOutputStream fos = null;
 
                 //dir이름과 path지정. dir가 없을 경우 dir 생성
@@ -156,6 +216,8 @@ public class webview extends AppCompatActivity implements OnEditorActionListener
                     e.printStackTrace();
                 }
                 Toast.makeText(getApplicationContext(), dateString + ".png 저장", Toast.LENGTH_LONG).show();
+*/
+
                 webview.getDrawingCache(false);
                 webview.destroyDrawingCache();
 
@@ -199,6 +261,7 @@ public class webview extends AppCompatActivity implements OnEditorActionListener
             }
         });
 
+
         // webview 내 주소 입력창
         buttonGo = findViewById(R.id.buttonGO);
         buttonGo.setOnClickListener(new View.OnClickListener() {
@@ -213,6 +276,18 @@ public class webview extends AppCompatActivity implements OnEditorActionListener
         });
 
     }
+
+    // 파파고 핸들러
+    @SuppressLint("HandlerLeak")
+    Handler papago_handler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+            Bundle bundle = msg.getData();
+            String resultWord = bundle.getString("resultWord");
+            Log.i("papago", resultWord);
+            tts.speak(resultWord, TextToSpeech.QUEUE_FLUSH, null);
+        }
+    };
 
     // 뒤로가기 2번 입력시 webview 종료
     @Override
@@ -258,7 +333,7 @@ public class webview extends AppCompatActivity implements OnEditorActionListener
             var10000.hideSoftInputFromWindow(v.getWindowToken(), 0);
         }
     }
-
+/*
     // filePath -> uri 변환
     private Uri fileUri(String fp){
         String fileName= "file:///storage/emulated/0/Download/1.png";
@@ -280,11 +355,12 @@ public class webview extends AppCompatActivity implements OnEditorActionListener
 
         return uri;
    }
+*/
 
     // 이미지 초기화
-    private void getIMG(String fp) throws IOException {
-        String path = fp;
-        bitmap = MediaStore.Images.Media.getBitmap(getContentResolver(), fileUri(path));
+    private void getIMG() throws IOException {
+        bitmap = webview.getDrawingCache();
+        // bitmap = MediaStore.Images.Media.getBitmap(getContentResolver(), fileUri(path));
         bitmap = scaleBitmapDown(bitmap, 640);
         // Convert bitmap to base64 encoded string
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();

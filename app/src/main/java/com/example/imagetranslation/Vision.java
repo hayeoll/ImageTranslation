@@ -1,5 +1,6 @@
 package com.example.imagetranslation;
 
+import android.util.Log;
 import androidx.annotation.NonNull;
 import com.google.android.gms.tasks.Continuation;
 import com.google.android.gms.tasks.OnCompleteListener;
@@ -12,8 +13,7 @@ public class Vision {
     private FirebaseFunctions mFunctions;
     public String text;
 
-    public void OCR(String enImg) {
-        String base64encoded = enImg;
+    public String OCR(String base64encoded) {
         mFunctions = FirebaseFunctions.getInstance();
         // 요청 오브젝트 생성
         JsonObject request = new JsonObject();
@@ -27,12 +27,8 @@ public class Vision {
         JsonArray features = new JsonArray();
         features.add(feature);
         request.add("features", features);
-        // 언어 힌트
-        JsonObject imageContext = new JsonObject();
-        JsonArray languageHints = new JsonArray();
-        languageHints.add("en");
-        imageContext.add("languageHints", languageHints);
-        request.add("imageContext", imageContext);
+
+
 
         //함수 호출
         annotateImage(request.toString())
@@ -41,15 +37,17 @@ public class Vision {
                     public void onComplete(@NonNull Task<JsonElement> task) {
                         if (!task.isSuccessful()) {
                             // Task failed with an exception
-                            // ...
+                            Log.e("OCR", "OCR태스크오류!!!");
                         } else {
                             // Task completed successfully
                             JsonObject annotation = task.getResult().getAsJsonArray().get(0).getAsJsonObject().get("fullTextAnnotation").getAsJsonObject();
                             text = annotation.get("text").getAsString();
-                            // lang = annotation.get("languageCode").getAsString();
+                            Log.i("OCR", "OCR 성공"+text);
                         }
                     }
                 });
+
+        return text;
     }
 
     private Task<JsonElement> annotateImage(String requestJson) {
@@ -61,7 +59,7 @@ public class Vision {
                     public JsonElement then(@NonNull Task<HttpsCallableResult> task) {
                         // This continuation runs on either success or failure, but if the task
                         // has failed then getResult() will throw an Exception which will be
-                        // propagated down.
+                        // propagated down
                         return JsonParser.parseString(new Gson().toJson(task.getResult().getData()));
                     }
                 });

@@ -20,7 +20,9 @@
             </intent-filter>
         </activity>
         <activity android:name=".webview"/>
-        <activity android:name=".setting"/>
+        <meta-data
+                android:name="com.google.firebase.ml.vision.DEPENDENCIES"
+                android:value="ocr" />
     </application>
 
 </manifest>
