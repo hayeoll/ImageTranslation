@@ -1,12 +1,13 @@
 package com.example.imagetranslation;
 
 import android.annotation.SuppressLint;
-import android.content.ContentUris;
 import android.content.Context;
 import android.content.Intent;
-import android.database.Cursor;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
@@ -25,18 +26,21 @@ import android.webkit.WebViewClient;
 import android.widget.*;
 import android.widget.TextView.OnEditorActionListener;
 
-
+import androidx.annotation.NonNull;
+import com.google.android.gms.tasks.*;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
+import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.StorageReference;
+import com.google.firebase.storage.UploadTask;
+import org.jetbrains.annotations.NotNull;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
+import java.io.*;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -48,22 +52,42 @@ public class webview extends AppCompatActivity implements OnEditorActionListener
     public Button menuSC, menuBack, menuForward, menuRefresh, buttonGo;
     private EditText et_url;
 
-    private TextToSpeech tts;
-    private Bitmap bitmap;
-    private String encodedImg;
+    private FirebaseStorage storage;
 
+    private TextToSpeech tts;
+    private String encodedImg;
+    private String imgPath;
+    private String imgUri;
+    private String ocrText;
+
+    private String ocrApiGwUrl;
+    private String ocrSecretKey;
+    private String nmtClientId;
+    private String nmtClientSecret;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.webview);
 
+        SharedPreferences sharedPref = getSharedPreferences("PREF", Context.MODE_PRIVATE);
+        ocrApiGwUrl = sharedPref.getString("ocr_api_gw_url", "https://75b7e8ede5b84d4280e129049fa60039.apigw.ntruss.com/custom/v1/12543/2ad8a7049d7c5511ac254f5f51fe70a046ebd884729056f0fe57f5160d467153/general");
+        ocrSecretKey = sharedPref.getString("ocr_secret_key", "c1dPTVltRVFobFV6UXVjQXdFaWZsb1lTbHJ0T0Z6d1Q=");
+        nmtClientId = "pBQUOpspBX4fPLfJYidC";
+        nmtClientSecret = "hDELh4QLQC";
+
+        imgUri = "https://firebasestorage.googleapis.com/v0/b/it-browser-eec3a.appspot.com/o/images%2F20211125181227.png?alt=media&token=d05f5ac5-27d2-4f95-bdb7-7fcfffa07ed3";
+
+
+        // 스토리지 생성
+        storage = FirebaseStorage.getInstance();
+
         // 액션바 제거
         ActionBar actionBar = getSupportActionBar();
         actionBar.hide();
 
         imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-        et_url= (EditText)findViewById(R.id.enter_url);
+        et_url = (EditText) findViewById(R.id.enter_url);
         buttonGo = findViewById(R.id.buttonGO);
 
         et_url.setOnEditorActionListener(this);
@@ -77,7 +101,7 @@ public class webview extends AppCompatActivity implements OnEditorActionListener
         String get_url = secondIntent.getStringExtra("url");
 
         // 웹뷰 시작
-        webview = (WebView)findViewById(R.id.webView);
+        webview = (WebView) findViewById(R.id.webView);
         WebSettings webSettings = webview.getSettings(); // 세부 세팅
         webSettings.setJavaScriptEnabled(true); // 웹페이지 자바 스크립트 허용
         webSettings.setSupportMultipleWindows(false); // 새 창 띄우기 허용
@@ -116,7 +140,7 @@ public class webview extends AppCompatActivity implements OnEditorActionListener
         menuBack.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if(webview.canGoBack()) {
+                if (webview.canGoBack()) {
                     webview.goBack();
                 }
             }
@@ -124,7 +148,7 @@ public class webview extends AppCompatActivity implements OnEditorActionListener
         menuForward.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if(webview.canGoForward()) {
+                if (webview.canGoForward()) {
                     webview.goForward();
                 }
             }
@@ -141,123 +165,19 @@ public class webview extends AppCompatActivity implements OnEditorActionListener
         menuSC.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-
-                //drawing cache 허용.
-                //cache에 실제로 cache저장
-                //cache에 저장된 bitmap을 가져온다.
-
-                webview.getDrawingCache(true);
-                webview.buildDrawingCache();
                 try {
-                    getIMG();
-                    Log.i("OCR", "encodedImg: "+encodedImg);
-                } catch (IOException e) {
+                    screenCapture();
+                    uploadStorage(imgPath);
+                    webview.OcrTask ocrTask = new webview.OcrTask();
+                    ocrTask.execute(ocrApiGwUrl, ocrSecretKey, imgUri);
+                    webview.NmtTask task = new NmtTask();
+                    task.execute(ocrText, "en", "kr", nmtClientId, nmtClientSecret);
+                    Log.i("OCR","detectedText:"+ ocrText);
+                } catch (FileNotFoundException e) {
                     e.printStackTrace();
-                    Log.e("OCR", "getIMG 실패 !!!!!");
-                }
-                new Thread(() -> {
-                    Log.d("OCR", "쓰레드 시작");
-                    Log.d("OCR", "OCR encodedImg : "+encodedImg);
-
-
-                    // OCR
-                    if(encodedImg !=null)
-                    {
-                        Vision vi = new Vision();
-                        Log.d("OCR", "OCR 실행");
-                        String ocrText = vi.OCR(encodedImg);
-                        Log.i("OCR", ocrText);
-
-                    } else{
-                        Log.e("OCR", "OCR encodedImg 전송 실패");
-                    }
-
-                    String text = "한국말도 할 수 있어요. Hello, I'm sleepy";
-                    Papago papago = new Papago();
-                    String resultWord = papago.getTranslation(text, "en");
-                    Log.d("papago", "resultWord: "+resultWord);
-
-                    Bundle papagoBundle = new Bundle();
-                    papagoBundle.putString("resultWord", resultWord);
-
-                    Message msg = papago_handler.obtainMessage();
-                    msg.setData(papagoBundle);
-                    papago_handler.sendMessage(msg);
-
-                }).start();
-                // Bitmap captureView = webview.getDrawingCache();
-/*
-                FileOutputStream fos = null;
-
-                //dir이름과 path지정. dir가 없을 경우 dir 생성
-                String CAPTURE_PATH = "/CAPTURE_TEST";
-                String strFolderPath = "/data/data/com.example.imagetranslation" + CAPTURE_PATH;
-                File folder = new File(strFolderPath);
-                if(!folder.exists()){
-                    folder.mkdirs();
-                }
-
-                //생성될 img이름 지정
-                SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMddHHmmss");
-                Date currentTime = new Date();
-                String dateString = formatter.format(currentTime);
-
-                String strFilePath = strFolderPath + "/" + dateString +".png";
-                File fileCacheItem = new File(strFilePath);
-
-                try {
-                    fos = new FileOutputStream(fileCacheItem);
-                    captureView.compress(Bitmap.CompressFormat.PNG, 100, fos);
-                    fos.flush();
-                    fos.close();
-                } catch (FileNotFoundException e){
-                    e.printStackTrace();
-                } catch (Throwable e) {
+                } catch (Exception e) {
                     e.printStackTrace();
                 }
-                Toast.makeText(getApplicationContext(), dateString + ".png 저장", Toast.LENGTH_LONG).show();
-*/
-
-                webview.getDrawingCache(false);
-                webview.destroyDrawingCache();
-
-
-
-/*
-                Log.d("SC","SC Start");
-
-                // Screen Capture
-                imgPath="file:///storage/emulated/0/Download/1.png";
-                Log.d("SC", "이미지 패스: " +  imgPath);
-
-                // 이미지 가져오기
-                try {
-                    getIMG(imgPath);
-                    Log.d("SC", "uri : " + fileUri(imgPath));
-                } catch (IOException e) {
-                    e.printStackTrace();
-                    Log.e("IMG", "이미지 가져오기 실패");
-                }
-                // OCR
-                if (encodedImg != null) {
-                    Vision vi = new Vision();
-                    vi.OCR(encodedImg);
-
-                    // 테스트용 토스트
-                    if (vi.text != null) {
-                        Log.i("OCR", "OCR 추출 : " + vi.text);
-                        Toast.makeText(webview.this, "OCR 추출 : " + vi.text, Toast.LENGTH_SHORT).show();
-                    } else {
-                        Log.e("OCR", "OCR 실패");
-                    }
-                }
-
-
-                // 번역
-                // TTS 초기화
-                // TTS
-*/
-
             }
         });
 
@@ -289,6 +209,76 @@ public class webview extends AppCompatActivity implements OnEditorActionListener
         }
     };
 
+    private void screenCapture() {
+        webview.getDrawingCache(true);
+        webview.buildDrawingCache();
+        Bitmap captureView = webview.getDrawingCache();
+        FileOutputStream fos = null;
+
+        //dir이름과 path지정. dir가 없을 경우 dir 생성
+        String CAPTURE_PATH = "/CAPTURE_TEST";
+        String strFolderPath = "/data/data/com.example.imagetranslation" + CAPTURE_PATH;
+        File folder = new File(strFolderPath);
+        if (!folder.exists()) {
+            folder.mkdirs();
+        }
+
+        //생성될 img이름 지정
+        SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMddHHmmss");
+        Date currentTime = new Date();
+        String dateString = formatter.format(currentTime);
+
+        String strFilePath = strFolderPath + "/" + dateString + ".png";
+        imgPath = strFilePath;
+        File fileCacheItem = new File(strFilePath);
+
+        try {
+            fos = new FileOutputStream(fileCacheItem);
+            captureView.compress(Bitmap.CompressFormat.PNG, 100, fos);
+            fos.flush();
+            fos.close();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (Throwable e) {
+            e.printStackTrace();
+        }
+        Toast.makeText(getApplicationContext(), dateString + ".png 저장", Toast.LENGTH_LONG).show();
+        webview.getDrawingCache(false);
+        webview.destroyDrawingCache();
+    }
+
+    // 스토리지 업로드
+    private void uploadStorage(String uri) throws FileNotFoundException {
+        FirebaseStorage storage = FirebaseStorage.getInstance();
+        StorageReference storageRef = storage.getReference();
+        Uri file = Uri.fromFile(new File(uri));
+        final StorageReference riversRef = storageRef.child("images/" + file.getLastPathSegment());
+        UploadTask uploadTask = riversRef.putFile(file);
+
+        Task<Uri> urlTask = uploadTask.continueWithTask(new Continuation<UploadTask.TaskSnapshot, Task<Uri>>() {
+            @Override
+            public Task<Uri> then(@NonNull @NotNull Task<UploadTask.TaskSnapshot> task) throws Exception {
+                if (!task.isSuccessful()) {
+                    throw task.getException();
+                }
+
+                return riversRef.getDownloadUrl();
+            }
+        }).addOnCompleteListener(new OnCompleteListener<Uri>() {
+            @Override
+            public void onComplete(@NonNull @NotNull Task<Uri> task) {
+                if (task.isSuccessful()) {
+                    Toast.makeText(webview.this, file.getLastPathSegment() + "저장", Toast.LENGTH_SHORT).show();
+                    imgUri = task.getResult().toString();
+                    Log.i("SC", imgUri + "업로드 성공");
+
+                } else {
+                    Log.e("SC", "업로드 실패");
+                }
+            }
+        });
+    }
+
     // 뒤로가기 2번 입력시 webview 종료
     @Override
     public void onBackPressed() {
@@ -296,11 +286,9 @@ public class webview extends AppCompatActivity implements OnEditorActionListener
         long gapTime = curTime - backBtnTime;
         if (webview.canGoBack()) {
             webview.goBack();
-        }
-        else if (0 <= gapTime && 2000 >= gapTime) {
+        } else if (0 <= gapTime && 2000 >= gapTime) {
             super.onBackPressed();
-        }
-        else {
+        } else {
             backBtnTime = curTime;
             Toast.makeText(this, "한번 더 누르면 종료됩니다.", Toast.LENGTH_SHORT).show();
         }
@@ -333,60 +321,82 @@ public class webview extends AppCompatActivity implements OnEditorActionListener
             var10000.hideSoftInputFromWindow(v.getWindowToken(), 0);
         }
     }
-/*
-    // filePath -> uri 변환
-    private Uri fileUri(String fp){
-        String fileName= "file:///storage/emulated/0/Download/1.png";
 
-        Uri fileUri = Uri.parse( fileName );
-
-        String filePath = fileUri.getPath();
-
-        Cursor c = getContentResolver().query( MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-
-                null, "_data = '" + filePath + "'", null, null );
-
-        c.moveToNext();
-
-        int id = c.getInt( c.getColumnIndex( "_id" ) );
-
-        Uri uri = ContentUris.withAppendedId( MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id );
-
-
-        return uri;
-   }
-*/
-
-    // 이미지 초기화
-    private void getIMG() throws IOException {
-        bitmap = webview.getDrawingCache();
-        // bitmap = MediaStore.Images.Media.getBitmap(getContentResolver(), fileUri(path));
-        bitmap = scaleBitmapDown(bitmap, 640);
-        // Convert bitmap to base64 encoded string
-        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 100, byteArrayOutputStream);
-        byte[] imageBytes = byteArrayOutputStream.toByteArray();
-        String base64encoded = Base64.encodeToString(imageBytes, Base64.NO_WRAP);
-        encodedImg = base64encoded;
-    }
-
-    // 비트맵 스케일 다운
-    private Bitmap scaleBitmapDown(Bitmap bitmap, int maxDimension) {
-        int originalWidth = bitmap.getWidth();
-        int originalHeight = bitmap.getHeight();
-        int resizedWidth = maxDimension;
-        int resizedHeight = maxDimension;
-
-        if (originalHeight > originalWidth) {
-            resizedHeight = maxDimension;
-            resizedWidth = (int) (resizedHeight * (float) originalWidth / (float) originalHeight);
-        } else if (originalWidth > originalHeight) {
-            resizedWidth = maxDimension;
-            resizedHeight = (int) (resizedWidth * (float) originalHeight / (float) originalWidth);
-        } else if (originalHeight == originalWidth) {
-            resizedHeight = maxDimension;
-            resizedWidth = maxDimension;
+    public class OcrTask extends AsyncTask<String, String, String> {
+        @Override
+        public String doInBackground(String... strings) {
+            Log.d("OCR", "ocr doInBack");
+            return OcrProc.main(strings[0], strings[1], strings[2]);
         }
-        return Bitmap.createScaledBitmap(bitmap, resizedWidth, resizedHeight, false);
+        @Override
+        protected void onPostExecute(String result) {
+            ReturnOcrResult(result);
+        }
     }
+
+    private void ReturnOcrResult(String result) {
+        String detectedText = "";
+        String rlt = result;
+        try {
+            JSONObject jsonObject = new JSONObject(rlt);
+            JSONArray jsonArray = jsonObject.getJSONArray("images");
+            for (int i = 0; i < jsonArray.length(); i++) {
+                JSONArray jsonArray_fields = jsonArray.getJSONObject(i).getJSONArray("fields");
+                for (int j = 0; j < jsonArray_fields.length(); j++) {
+                    String inferText = jsonArray_fields.getJSONObject(j).getString("inferText");
+                    detectedText += inferText;
+                    detectedText += " ";
+                }
+            }
+            Log.i("OCR","detectedText:"+ detectedText);
+            CSSExecute(detectedText);
+        } catch (Exception e) {
+            Log.e("OCR","ocr 실패");
+
+        }
+    }
+
+    private void CSSExecute(String result) {
+        webview.NmtTask task = new NmtTask();
+        task.execute(result, "en", "kr", nmtClientId, nmtClientSecret);
+        Log.d("OCR", "CSS");
+        Log.i("OCR", "message:"+result);
+    }
+
+
+    public class NmtTask extends AsyncTask<String, String, String> {
+        @Override
+        public String doInBackground(String... strings) {
+            Log.d("OCR", "nmt doInBack");
+            return NmtProc.main(strings[0], strings[1], strings[2], strings[3], strings[4]);
+        }
+        @Override
+        protected void onPostExecute(String result) {
+            ReturnNmtResult(result);
+            Log.d("OCR", "nmt returnResult");
+        }
+    }
+
+    public void ReturnNmtResult(String result) {
+        //{"message":{"@type":"response","@service":"naverservice.nmt.proxy","@version":"1.0.0","result":{"srcLangType":"ko","tarLangType":"en","translatedText":"Hello."}}}
+        String rlt = result;
+        Log.d("OCR","rnr rlt" + rlt);
+        try {
+            JSONObject jsonObject = new JSONObject(rlt);
+            String text = jsonObject.getString("message");
+            jsonObject = new JSONObject(text);
+            jsonObject = new JSONObject(jsonObject.getString("result"));
+            text = jsonObject.getString("translatedText");
+            //System.out.println(text);
+
+            Log.i("OCR","text:"+text);
+            tts.speak(text, TextToSpeech.QUEUE_FLUSH, null);
+            Log.d("OCR", "Nmt 결과: " + text);
+        } catch (Exception e) {
+            Log.e("OCR", "Nmt 오류");
+        }
+    }
+
 }
+
+

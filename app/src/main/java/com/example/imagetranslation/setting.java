@@ -1,6 +1,7 @@
 package com.example.imagetranslation;
 
 
+import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.widget.Toast;
@@ -26,12 +27,16 @@ public class setting extends AppCompatActivity {
     ListItemAdapter adapter;
     ListItem item;
 
-    String language;
+    public static Context context_setting;
+    public int pos;
+    public String language;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.setting);
+
+        context_setting = this;
 
         // list view 참조
         listview = findViewById(R.id.languageList);
@@ -72,6 +77,9 @@ public class setting extends AppCompatActivity {
                 // 선택된 언어 정보 저장
                 item = (ListItem) adapter.getItem(checked);
                 language = item.getLanguage();
+
+
+                pos = checked;
 
                 if (checked < 0) {
                     Toast.makeText(getApplicationContext(), "언어 선택 안됨", Toast.LENGTH_SHORT).show();
